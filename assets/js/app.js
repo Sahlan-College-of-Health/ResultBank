@@ -2341,6 +2341,20 @@ function calculateSemesterSummary(courses) {
   };
 }
 
+function isSecondSemester(semester) {
+  const value = String(semester || "")
+    .trim()
+    .toLowerCase();
+
+  return (
+    value === "2" ||
+    value === "second" ||
+    value === "second semester" ||
+    value.includes("second") ||
+    value.includes("2nd")
+  );
+}
+
 function academicRemark(cgpa, carryCount) {
   const value = Number(cgpa || 0);
 
@@ -2516,6 +2530,8 @@ async function recalculateAllResults() {
 
       let cumulativeUnits = 0;
       let cumulativePoints = 0;
+      let consecutiveProbationYears = 0;
+
       const latestCourseStatus = new Map();
 
       studentResults.forEach(result => {
@@ -2551,6 +2567,29 @@ async function recalculateAllResults() {
             lastScore: item.score
           }));
 
+        let remark = academicRemark(cgpa, unresolved.length);
+
+        /*
+          Count probation once per completed academic year.
+          The Second Semester result represents the final standing
+          for that academic year.
+        */
+        if (isSecondSemester(result.semester)) {
+          if (remark === "Probation") {
+            consecutiveProbationYears += 1;
+
+            if (consecutiveProbationYears >= 2) {
+              remark = "Repeat";
+            }
+          } else {
+            /*
+              The student has improved, so the consecutive
+              probation-year count starts again from zero.
+            */
+            consecutiveProbationYears = 0;
+          }
+        }
+
         updates.push({
           id: result.id,
           data: {
@@ -2561,7 +2600,8 @@ async function recalculateAllResults() {
             cgpa,
             carryOvers: unresolved.length,
             unresolvedCarryOvers: unresolved,
-            remark: academicRemark(cgpa, unresolved.length),
+            remark,
+            consecutiveProbationYears,
             calculationStatus: "calculated",
             calculatedAt: serverTimestamp()
           }
@@ -2723,6 +2763,8 @@ async function recalculateSingleStudent(studentId) {
 
   let cumulativeUnits = 0;
   let cumulativePoints = 0;
+  let consecutiveProbationYears = 0;
+
   const latestCourseStatus = new Map();
   const updates = [];
 
@@ -2754,6 +2796,20 @@ async function recalculateSingleStudent(studentId) {
         lastScore: item.score
       }));
 
+    let remark = academicRemark(cgpa, unresolved.length);
+
+    if (isSecondSemester(result.semester)) {
+      if (remark === "Probation") {
+        consecutiveProbationYears += 1;
+
+        if (consecutiveProbationYears >= 2) {
+          remark = "Repeat";
+        }
+      } else {
+        consecutiveProbationYears = 0;
+      }
+    }
+
     updates.push({
       id: result.id,
       data: {
@@ -2764,7 +2820,8 @@ async function recalculateSingleStudent(studentId) {
         cgpa,
         carryOvers: unresolved.length,
         unresolvedCarryOvers: unresolved,
-        remark: academicRemark(cgpa, unresolved.length),
+        remark,
+        consecutiveProbationYears,
         calculationStatus: "calculated",
         calculatedAt: serverTimestamp()
       }
