@@ -3769,7 +3769,7 @@ async function viewResultRecord(resultId) {
 }
 
 
-function printResultDocument(mode = "semester") {
+async function printResultDocument(mode = "semester") {
   const resultElement = document.querySelector(".official-result");
 
   if (!resultElement) {
@@ -3777,34 +3777,126 @@ function printResultDocument(mode = "semester") {
     return;
   }
 
-  document.getElementById("printOnlyContainer")?.remove();
+  const existingFrame = document.getElementById("resultPrintFrame");
 
-  const printContainer = document.createElement("div");
-  printContainer.id = "printOnlyContainer";
-  printContainer.className = `print-only-container print-${mode}`;
+  if (existingFrame) {
+    existingFrame.remove();
+  }
+
+  const printFrame = document.createElement("iframe");
+
+  printFrame.id = "resultPrintFrame";
+  printFrame.setAttribute("title", "Result printing");
+  printFrame.style.position = "fixed";
+  printFrame.style.right = "0";
+  printFrame.style.bottom = "0";
+  printFrame.style.width = "0";
+  printFrame.style.height = "0";
+  printFrame.style.border = "0";
+  printFrame.style.visibility = "hidden";
+
+  document.body.appendChild(printFrame);
 
   const resultClone = resultElement.cloneNode(true);
+
   resultClone.removeAttribute("id");
 
   resultClone.querySelectorAll("[id]").forEach(element => {
     element.removeAttribute("id");
   });
 
-  printContainer.appendChild(resultClone);
-  document.body.appendChild(printContainer);
-  document.body.classList.add("printing-result");
+  const printDocument =
+    printFrame.contentDocument ||
+    printFrame.contentWindow.document;
 
-  const cleanup = () => {
-    document.body.classList.remove("printing-result");
-    document.getElementById("printOnlyContainer")?.remove();
-    window.removeEventListener("afterprint", cleanup);
+  const basePath = new URL("./", window.location.href).href;
+
+  printDocument.open();
+
+  printDocument.write(`
+    <!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1"
+        >
+
+        <base href="${basePath}">
+
+        <title>SAHLAN Student Result</title>
+
+        <link
+          rel="stylesheet"
+          href="./assets/css/style.css?v=3.0.1"
+        >
+
+        <link
+          rel="stylesheet"
+          href="./assets/css/print.css?v=3.0.1"
+        >
+      </head>
+
+      <body class="printing-result">
+        <div
+          id="printOnlyContainer"
+          class="print-only-container print-${mode}"
+        >
+          ${resultClone.outerHTML}
+        </div>
+      </body>
+    </html>
+  `);
+
+  printDocument.close();
+
+  const waitForImages = async () => {
+    const images = [...printDocument.images];
+
+    await Promise.all(
+      images.map(image => {
+        if (image.complete) {
+          return Promise.resolve();
+        }
+
+        return new Promise(resolve => {
+          image.onload = resolve;
+          image.onerror = resolve;
+        });
+      })
+    );
   };
 
-  window.addEventListener("afterprint", cleanup);
-  window.print();
-  setTimeout(cleanup, 3000);
-}
+  const waitForStyles = () => {
+    return new Promise(resolve => {
+      setTimeout(resolve, 1200);
+    });
+  };
 
+  try {
+    await waitForImages();
+    await waitForStyles();
+
+    const printWindow = printFrame.contentWindow;
+
+    printWindow.focus();
+    printWindow.print();
+
+    setTimeout(() => {
+      printFrame.remove();
+    }, 5000);
+  } catch (error) {
+    console.error("Result printing error:", error);
+
+    printFrame.remove();
+
+    alert(
+      "The result could not be prepared for printing. Please try again."
+    );
+  }
+}
 function formatNumber(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number.toFixed(2) : "0.00";
