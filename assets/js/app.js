@@ -3179,23 +3179,27 @@ function isSecondSemester(semester) {
     value.includes("2nd");
 }
 
-function academicRemark(cgpa, carryCount) {
+function academicRemark(cgpa) {
   const value = Number(cgpa || 0);
 
-  if (carryCount >= Number(gradingSettings.probationCarryOvers) || value < Number(gradingSettings.probationCgpa)) {
-    return "Probation";
+  if (value >= 3.50) {
+    return "Distinction";
   }
 
-  if (carryCount >= Number(gradingSettings.warningCarryOvers) || value < Number(gradingSettings.warningCgpa)) {
-    return "Academic Warning";
+  if (value >= 3.00) {
+    return "Upper Credit";
   }
 
-  if (value >= 4.5) return "Distinction";
-  if (value >= 3.5) return "Upper Credit";
-  if (value >= 2.5) return "Lower Credit";
-  return "Pass";
+  if (value >= 2.50) {
+    return "Lower Credit";
+  }
+
+  if (value >= 2.00) {
+    return "Pass";
+  }
+
+  return "Probation";
 }
-
 function resultSortKey(result) {
   const sessionStart = Number(String(result.resultSession || "0").split("/")[0]) || 0;
   const semesterOrder = String(result.semester).toLowerCase().startsWith("first") ? 1 : 2;
@@ -3390,7 +3394,7 @@ async function recalculateAllResults() {
             lastScore: item.score
           }));
 
-        let remark = academicRemark(cgpa, unresolved.length);
+        let remark = academicRemark(cgpa);
 
         if (isSecondSemester(result.semester)) {
           if (remark === "Probation") {
@@ -3606,7 +3610,7 @@ async function recalculateSingleStudent(studentId) {
         lastScore: item.score
       }));
 
-    let remark = academicRemark(cgpa, unresolved.length);
+    let remark = academicRemark(cgpa);
 
     if (isSecondSemester(result.semester)) {
       if (remark === "Probation") {
