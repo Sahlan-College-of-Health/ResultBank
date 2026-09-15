@@ -3761,13 +3761,7 @@ async function viewResultRecord(resultId) {
       </div>
 
       <article id="printableResult" class="official-result">
-        <header class="result-header">
-          <img src="assets/images/logo.png" alt="School logo">
-          <div>
-            <h1>${APP_CONFIG.schoolName}</h1>
-            <h2>OFFICIAL SEMESTER RESULT</h2>
-          </div>
-        </header>
+        ${officialResultHeader("OFFICIAL SEMESTER RESULT", result)}
 
         <section class="student-detail-grid">
           <div><strong>Name:</strong> ${escapeHtml(result.studentName || student.name)}</div>
