@@ -4141,7 +4141,7 @@ function renderYearResult(student, results, year) {
   area.innerHTML = rows.length ? `
     <div class="result-toolbar no-print"><h3>Year ${year} Result</h3><button id="printYear" class="primary-btn">Print Year ${year}</button></div>
     <article class="official-result session-result compact-a4-result">
-      ${officialResultHeader(`YEAR ${year} COMPLETE SESSION RESULT`)}
+      ${officialResultHeader(`YEAR ${year} COMPLETE SESSION RESULT`, student)}
       ${studentIdentitySection(student)}
       ${rows.map(semesterResultBlock).join("")}
       ${yearSummaryBlock(rows)}
@@ -4158,7 +4158,7 @@ function renderCompleteTranscript(student, results) {
   area.innerHTML = `
     <div class="result-toolbar no-print"><h3>Complete Transcript</h3><button id="printTranscript" class="primary-btn">Print Transcript</button></div>
     <article class="official-result">
-      ${officialResultHeader("COMPLETE ACADEMIC TRANSCRIPT")}
+      ${officialResultHeader("COMPLETE ACADEMIC TRANSCRIPT", student)}
       ${studentIdentitySection(student)}
       ${levels.map(level => `
         <section class="transcript-year">
