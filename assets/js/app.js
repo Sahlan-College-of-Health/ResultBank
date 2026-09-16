@@ -3324,6 +3324,13 @@ function resultSortKey(result) {
   return sessionStart * 100 + Number(result.level || 0) * 10 + semesterOrder;
 }
 
+function isSecondSemester(semester) {
+  return String(semester || "")
+    .trim()
+    .toLowerCase()
+    .startsWith("second");
+}
+
 async function renderResults() {
   dashboardLayout(`
     <section class="section-head">
