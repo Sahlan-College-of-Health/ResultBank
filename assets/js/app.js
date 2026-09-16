@@ -1644,6 +1644,52 @@ function readGradingEditor(prefix, isNursing=false) {
   return isNursing ? {...base,remarks:[],carryOverRemarks:remarks,remarkMode:"carryovers"} : {...base,remarks,remarkMode:"cgpa"};
 }
 
+function validateGradingBands(bands) {
+  if (!bands.length) {
+    throw new Error("At least one grading band is required.");
+  }
+
+  bands.forEach(band => {
+    if (!band.grade) {
+      throw new Error("Every grading row must have a grade.");
+    }
+
+    if (
+      Number(band.min) < 0 ||
+      Number(band.max) > 100 ||
+      Number(band.min) > Number(band.max)
+    ) {
+      throw new Error(`Invalid score range for grade ${band.grade}.`);
+    }
+
+    if (Number(band.point) < 0) {
+      throw new Error(`Grade point for ${band.grade} cannot be negative.`);
+    }
+  });
+
+  const sorted = [...bands].sort(
+    (a, b) => Number(a.min) - Number(b.min)
+  );
+
+  for (let index = 1; index < sorted.length; index += 1) {
+    if (Number(sorted[index].min) <= Number(sorted[index - 1].max)) {
+      throw new Error(
+        `The score ranges for ${sorted[index - 1].grade} and ${sorted[index].grade} overlap.`
+      );
+    }
+  }
+
+  const coversZero = Number(sorted[0].min) === 0;
+  const coversHundred =
+    Number(sorted[sorted.length - 1].max) === 100;
+
+  if (!coversZero || !coversHundred) {
+    throw new Error(
+      "The grading system must cover scores from 0 to 100."
+    );
+  }
+}
+
 function validateRemarkBands(remarks, scale) {
   if (!remarks.length) throw new Error("At least one academic remark is required.");
   remarks.forEach(r=>{if(!r.remark||r.min<0||r.max>scale||r.min>r.max)throw new Error(`Invalid CGPA remark range for ${r.remark||"blank remark"}.`);});
