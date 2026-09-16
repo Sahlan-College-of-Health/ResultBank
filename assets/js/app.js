@@ -3302,13 +3302,13 @@ function gradeFromScore(score, department=null){
   const settings=gradingForDepartment(department); const numericScore=Number(score);
   return settings.bands.find(item=>numericScore>=Number(item.min)&&numericScore<=Number(item.max))||{grade:"F",point:0,status:"Carry Over"};
 }
-function calculateCourseRows(courses,department=null){return (courses||[]).map(course=>{const score=Number(course.score);const units=Number(course.units||0);const gradeInfo=gradeFromScore(score,department||course.department);return {courseCode:course.courseCode||"",courseTitle:course.courseTitle||"",units,score,grade:gradeInfo.grade,gradePoint:gradeInfo.point,creditPoint:units*gradeInfo.point,status:gradeInfo.status};});}
+function calculateCourseRows(courses, department = null) {   return (courses || []).map(course => {     const score = Number(course.score);     const units = Number(course.units || 0);      const gradeInfo = gradeFromScore(       score,       department || course.department     );      // COLLEGE RULE:     // Every score below 50 is a Carry Over.     const isCarryOver = score < 50;      return {       courseCode: course.courseCode || "",       courseTitle: course.courseTitle || "",       units,       score,       grade: gradeInfo.grade,       gradePoint: isCarryOver ? 0 : gradeInfo.point,       creditPoint: isCarryOver ? 0 : units * gradeInfo.point,       status: isCarryOver ? "Carry Over" : "Pass"     };   }); }
 function nursingCarryOverRemark(carryOvers){
   const count=Math.max(0,Math.floor(Number(carryOvers)||0));
   const match=(nursingGradingSettings.carryOverRemarks||[]).find(item=>count>=Number(item.min)&&count<=Number(item.max));
   return match?.remark || (count===0 ? "Promoted" : "Carry Over");
 }
-function calculateSemesterSummary(courses,department=null){const rows=calculateCourseRows(courses,department);const tnu=rows.reduce((sum,item)=>sum+Number(item.units||0),0);const tcp=rows.reduce((sum,item)=>sum+Number(item.creditPoint||0),0);const gpa=tnu>0?Number((tcp/tnu).toFixed(2)):0;const failed=rows.filter(item=>item.grade==="F");return {tnu,tcp,gpa,carryOvers:failed.length,remark:academicRemark(gpa,department,failed.length)};}
+function calculateSemesterSummary(courses, department = null) {   const rows = calculateCourseRows(courses, department);    const tnu = rows.reduce(     (sum, item) => sum + Number(item.units || 0),     0   );    const tcp = rows.reduce(     (sum, item) => sum + Number(item.creditPoint || 0),     0   );    const gpa = tnu > 0     ? Number((tcp / tnu).toFixed(2))     : 0;    // COLLEGE RULE:   // Every score below 50 is a Carry Over.   const failed = rows.filter(item => Number(item.score) < 50);    return {     tnu,     tcp,     gpa,     carryOvers: failed.length,     remark: academicRemark(       gpa,       department,       failed.length     )   }; }
 function academicRemark(cgpa,department=null,carryOvers=0){
   if(collegeKeyForDepartment(department)==="nursing") return nursingCarryOverRemark(carryOvers);
   const value=Number(cgpa||0);const settings=gradingForDepartment(department);const match=settings.remarks.find(item=>value>=Number(item.min)&&value<=Number(item.max));return match?.remark||"Probation";
@@ -3507,7 +3507,7 @@ async function recalculateAllResults() {
               courseTitle: course.courseTitle,
               score: course.score,
               grade: course.grade,
-              passed: course.grade !== "F",
+              passed: Number(course.score) >= 50,
               sortKey: resultSortKey(result)
             });
           }
@@ -3725,7 +3725,7 @@ async function recalculateSingleStudent(studentId) {
         courseCode: course.courseCode,
         courseTitle: course.courseTitle,
         score: course.score,
-        passed: course.grade !== "F"
+        passed: Number(course.score) >= 50
       });
     });
 
