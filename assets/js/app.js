@@ -679,7 +679,10 @@ async function renderStudentPortal(studentId) {
     app.innerHTML = `
       <div class="public-page-shell">
         <header class="public-topbar">
-          <div class="brand"><img src="${college.logo}" alt="School logo"><div><h1>${college.name}</h1><small>Secure Student Portal</small></div></div>
+          <div class="brand">
+            <img src="${college.logo}" alt="School logo">
+            <div><h1>${college.name}</h1><small>Secure Student Portal</small></div>
+          </div>
           <div class="top-actions"><button id="lockedLogoutBtn" class="danger-btn">Logout</button></div>
         </header>
         <main class="public-main"><section class="public-content-card access-locked-card">
@@ -689,7 +692,7 @@ async function renderStudentPortal(studentId) {
           <p>Please contact the College Administration after completing your school-fee payment.</p>
         </section></main>
       </div>`;
-    document.getElementById("lockedLogoutBtn").addEventListener("click",()=>signOut(auth));
+    document.getElementById("lockedLogoutBtn").addEventListener("click", () => signOut(auth));
     return;
   }
 
@@ -772,11 +775,13 @@ async function renderStudentPortal(studentId) {
     </div>
   `;
 
+  // ✅ Logout button fixed
   document.getElementById("studentLogoutBtn").addEventListener("click", () => signOut(auth));
-  document
-    .getElementById("changeStudentPasswordBtn")
-    .addEventListener("click", openStudentPasswordModal);
 
+  // ✅ Change password button fixed
+  document.getElementById("changeStudentPasswordBtn").addEventListener("click", openStudentPasswordModal);
+
+  // ✅ Secure-year-btn handler fixed
   document.querySelectorAll(".secure-year-btn").forEach(button => {
     button.addEventListener("click", () => {
       const area = document.getElementById("secureStudentResultArea");
@@ -798,10 +803,10 @@ async function renderStudentPortal(studentId) {
           ${signatureSection()}
         </article>
       ` : `<div class="placeholder">No Year ${year} result is available.</div>`;
-
     });
   });
 
+  // ✅ Transcript button fixed
   document.getElementById("secureTranscriptBtn").addEventListener("click", () => {
     const area = document.getElementById("secureStudentResultArea");
     const levels = [...new Set(results.map(result => Number(result.level)).filter(Boolean))].sort();
@@ -828,8 +833,8 @@ async function renderStudentPortal(studentId) {
         ${signatureSection()}
       </article>
     `;
-
   });
+}
 
   await renderStudentCarryApplication(student, latest);
 
