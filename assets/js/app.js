@@ -834,7 +834,6 @@ async function renderStudentPortal(studentId) {
       </article>
     `;
   });
-}
 
   await renderStudentCarryApplication(student, latest);
 
