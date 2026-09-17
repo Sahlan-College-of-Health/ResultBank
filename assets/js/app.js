@@ -679,10 +679,7 @@ async function renderStudentPortal(studentId) {
     app.innerHTML = `
       <div class="public-page-shell">
         <header class="public-topbar">
-          <div class="brand">
-            <img src="${college.logo}" alt="School logo">
-            <div><h1>${college.name}</h1><small>Secure Student Portal</small></div>
-          </div>
+          <div class="brand"><img src="${college.logo}" alt="School logo"><div><h1>${college.name}</h1><small>Secure Student Portal</small></div></div>
           <div class="top-actions"><button id="lockedLogoutBtn" class="danger-btn">Logout</button></div>
         </header>
         <main class="public-main"><section class="public-content-card access-locked-card">
@@ -692,7 +689,7 @@ async function renderStudentPortal(studentId) {
           <p>Please contact the College Administration after completing your school-fee payment.</p>
         </section></main>
       </div>`;
-    document.getElementById("lockedLogoutBtn").addEventListener("click", () => signOut(auth));
+    document.getElementById("lockedLogoutBtn").addEventListener("click",()=>signOut(auth));
     return;
   }
 
@@ -775,13 +772,11 @@ async function renderStudentPortal(studentId) {
     </div>
   `;
 
-  // ✅ Logout button fixed
   document.getElementById("studentLogoutBtn").addEventListener("click", () => signOut(auth));
+  document
+    .getElementById("changeStudentPasswordBtn")
+    .addEventListener("click", openStudentPasswordModal);
 
-  // ✅ Change password button fixed
-  document.getElementById("changeStudentPasswordBtn").addEventListener("click", openStudentPasswordModal);
-
-  // ✅ Secure-year-btn handler fixed
   document.querySelectorAll(".secure-year-btn").forEach(button => {
     button.addEventListener("click", () => {
       const area = document.getElementById("secureStudentResultArea");
@@ -803,10 +798,10 @@ async function renderStudentPortal(studentId) {
           ${signatureSection()}
         </article>
       ` : `<div class="placeholder">No Year ${year} result is available.</div>`;
+
     });
   });
 
-  // ✅ Transcript button fixed
   document.getElementById("secureTranscriptBtn").addEventListener("click", () => {
     const area = document.getElementById("secureStudentResultArea");
     const levels = [...new Set(results.map(result => Number(result.level)).filter(Boolean))].sort();
@@ -833,6 +828,7 @@ async function renderStudentPortal(studentId) {
         ${signatureSection()}
       </article>
     `;
+
   });
 
   await renderStudentCarryApplication(student, latest);
@@ -3306,13 +3302,13 @@ function gradeFromScore(score, department=null){
   const settings=gradingForDepartment(department); const numericScore=Number(score);
   return settings.bands.find(item=>numericScore>=Number(item.min)&&numericScore<=Number(item.max))||{grade:"F",point:0,status:"Carry Over"};
 }
-function calculateCourseRows(courses, department = null) {   return (courses || []).map(course => {     const score = Number(course.score);     const units = Number(course.units || 0);      const gradeInfo = gradeFromScore(       score,       department || course.department     );      // COLLEGE RULE:     // Every score below 50 is a Carry Over.     const isCarryOver = score < 50;      return {       courseCode: course.courseCode || "",       courseTitle: course.courseTitle || "",       units,       score,       grade: gradeInfo.grade,       gradePoint: isCarryOver ? 0 : gradeInfo.point,       creditPoint: isCarryOver ? 0 : units * gradeInfo.point,       status: isCarryOver ? "Carry Over" : "Pass"     };   }); }
+function calculateCourseRows(courses,department=null){return (courses||[]).map(course=>{const score=Number(course.score);const units=Number(course.units||0);const gradeInfo=gradeFromScore(score,department||course.department);return {courseCode:course.courseCode||"",courseTitle:course.courseTitle||"",units,score,grade:gradeInfo.grade,gradePoint:gradeInfo.point,creditPoint:units*gradeInfo.point,status:gradeInfo.status};});}
 function nursingCarryOverRemark(carryOvers){
   const count=Math.max(0,Math.floor(Number(carryOvers)||0));
   const match=(nursingGradingSettings.carryOverRemarks||[]).find(item=>count>=Number(item.min)&&count<=Number(item.max));
   return match?.remark || (count===0 ? "Promoted" : "Carry Over");
 }
-function calculateSemesterSummary(courses, department = null) {   const rows = calculateCourseRows(courses, department);    const tnu = rows.reduce(     (sum, item) => sum + Number(item.units || 0),     0   );    const tcp = rows.reduce(     (sum, item) => sum + Number(item.creditPoint || 0),     0   );    const gpa = tnu > 0     ? Number((tcp / tnu).toFixed(2))     : 0;    // COLLEGE RULE:   // Every score below 50 is a Carry Over.   const failed = rows.filter(item => Number(item.score) < 50);    return {     tnu,     tcp,     gpa,     carryOvers: failed.length,     remark: academicRemark(       gpa,       department,       failed.length     )   }; }
+function calculateSemesterSummary(courses,department=null){const rows=calculateCourseRows(courses,department);const tnu=rows.reduce((sum,item)=>sum+Number(item.units||0),0);const tcp=rows.reduce((sum,item)=>sum+Number(item.creditPoint||0),0);const gpa=tnu>0?Number((tcp/tnu).toFixed(2)):0;const failed=rows.filter(item=>item.grade==="F");return {tnu,tcp,gpa,carryOvers:failed.length,remark:academicRemark(gpa,department,failed.length)};}
 function academicRemark(cgpa,department=null,carryOvers=0){
   if(collegeKeyForDepartment(department)==="nursing") return nursingCarryOverRemark(carryOvers);
   const value=Number(cgpa||0);const settings=gradingForDepartment(department);const match=settings.remarks.find(item=>value>=Number(item.min)&&value<=Number(item.max));return match?.remark||"Probation";
@@ -3511,7 +3507,7 @@ async function recalculateAllResults() {
               courseTitle: course.courseTitle,
               score: course.score,
               grade: course.grade,
-              passed: Number(course.score) >= 50,
+              passed: course.grade !== "F",
               sortKey: resultSortKey(result)
             });
           }
@@ -3729,7 +3725,7 @@ async function recalculateSingleStudent(studentId) {
         courseCode: course.courseCode,
         courseTitle: course.courseTitle,
         score: course.score,
-        passed: Number(course.score) >= 50
+        passed: course.grade !== "F"
       });
     });
 
