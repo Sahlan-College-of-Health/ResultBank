@@ -38,19 +38,9 @@ service cloud.firestore {
     // ==========================================
 
     match /users/{userId} {
-
-      // IMPORTANT:
-      // A user can always read their own profile.
-      allow read: if signedIn() &&
-                  request.auth.uid == userId;
-
-      // Admin can read any user profile.
-      allow read: if currentUserIsAdmin();
-
-      // Only admin can create/update/delete user profiles.
-      allow create, update, delete: if currentUserIsAdmin();
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
     }
-
 
     // ==========================================
     // STUDENTS
