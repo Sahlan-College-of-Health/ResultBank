@@ -3,170 +3,84 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ==========================================
-    // BASIC AUTHENTICATION
-    // ==========================================
-
     function signedIn() {
       return request.auth != null;
     }
 
-    function userDocumentExists() {
+    function userProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function hasUserProfile() {
       return signedIn() &&
-        exists(
-          /databases/$(database)/documents/users/$(request.auth.uid)
-        );
+        exists(/databases/$(database)/documents/users/$(request.auth.uid));
     }
 
-    function currentUserIsAdmin() {
-      return userDocumentExists() &&
-        get(
-          /databases/$(database)/documents/users/$(request.auth.uid)
-        ).data.role == "admin";
+    function isAdmin() {
+      return hasUserProfile() && userProfile().role == "admin";
     }
 
-    function currentUserIsStudent() {
-      return userDocumentExists() &&
-        get(
-          /databases/$(database)/documents/users/$(request.auth.uid)
-        ).data.role == "student";
+    function isStudent() {
+      return hasUserProfile() && userProfile().role == "student";
     }
 
+    function ownsStudent(studentId) {
+      return isStudent() && userProfile().studentId == studentId;
+    }
 
-    // ==========================================
-    // USERS
-    // ==========================================
+    function studentResultAccess(studentId) {
+      return exists(/databases/$(database)/documents/students/$(studentId)) &&
+        get(/databases/$(database)/documents/students/$(studentId)).data.get('resultLocked', false) != true;
+    }
 
-    match /users/{userId} {
-      allow read: if true;
+    match /students/{studentId} {
+      allow read: if isAdmin() || ownsStudent(studentId);
       allow create, update, delete: if isAdmin();
     }
 
-    // ==========================================
-    // STUDENTS
-    // ==========================================
-
-    match /students/{studentId} {
-
-      allow read: if currentUserIsAdmin()
-        || (
-          currentUserIsStudent()
-          &&
-          get(
-            /databases/$(database)/documents/users/$(request.auth.uid)
-          ).data.studentId == studentId
-        );
-
-      allow create, update, delete: if currentUserIsAdmin();
-    }
-
-
-    // ==========================================
-    // RESULTS
-    // ==========================================
-
     match /results/{resultId} {
-
-      allow read: if currentUserIsAdmin()
-        || (
-          currentUserIsStudent()
-          &&
-          resource.data.studentId ==
-            get(
-              /databases/$(database)/documents/users/$(request.auth.uid)
-            ).data.studentId
-          &&
-          get(
-            /databases/$(database)/documents/students/$(get(
-              /databases/$(database)/documents/users/$(request.auth.uid)
-            ).data.studentId)
-          ).data.resultLocked != true
-        );
-
-      allow create, update, delete: if currentUserIsAdmin();
+      allow read: if isAdmin() ||
+        (isStudent() &&
+         resource.data.studentId == userProfile().studentId &&
+         studentResultAccess(userProfile().studentId));
+      allow create, update, delete: if isAdmin();
     }
-
-
-    // ==========================================
-    // COURSES
-    // ==========================================
 
     match /courses/{courseId} {
-
-      allow read, create, update, delete:
-        if currentUserIsAdmin();
+      allow read, create, update, delete: if isAdmin();
     }
-
-
-    // ==========================================
-    // SESSIONS
-    // ==========================================
 
     match /sessions/{sessionId} {
-
-      allow read, create, update, delete:
-        if currentUserIsAdmin();
+      allow read, create, update, delete: if isAdmin();
     }
-
-
-    // ==========================================
-    // SETTINGS
-    // ==========================================
 
     match /settings/{settingId} {
-
-      // Logged-in users can read settings.
       allow read: if signedIn();
-
-      allow create, update, delete:
-        if currentUserIsAdmin();
+      allow create, update, delete: if isAdmin();
     }
 
-
-    // ==========================================
-    // STUDENT CREDENTIALS
-    // ==========================================
+    match /users/{userId} {
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == userId);
+      allow create, update, delete: if isAdmin();
+    }
 
     match /studentCredentials/{studentId} {
-
-      allow read, create, update, delete:
-        if currentUserIsAdmin();
+      allow read, create, update, delete: if isAdmin();
     }
-
-
-    // ==========================================
-    // CARRY-OVER APPLICATIONS
-    // ==========================================
 
     match /carryOverApplications/{applicationId} {
+      allow read: if isAdmin() ||
+        (isStudent() &&
+         resource.data.studentId == userProfile().studentId &&
+         studentResultAccess(userProfile().studentId));
 
-      allow read: if currentUserIsAdmin()
-        || (
-          currentUserIsStudent()
-          &&
-          resource.data.studentId ==
-            get(
-              /databases/$(database)/documents/users/$(request.auth.uid)
-            ).data.studentId
-        );
+      allow create: if isStudent() &&
+        request.resource.data.studentId == userProfile().studentId &&
+        request.resource.data.status == "Pending" &&
+        studentResultAccess(userProfile().studentId);
 
-      allow create: if currentUserIsStudent()
-        &&
-        request.resource.data.studentId ==
-          get(
-            /databases/$(database)/documents/users/$(request.auth.uid)
-          ).data.studentId
-        &&
-        request.resource.data.status == "Pending";
-
-      allow update, delete:
-        if currentUserIsAdmin();
+      allow update, delete: if isAdmin();
     }
-
-
-    // ==========================================
-    // DENY EVERYTHING ELSE
-    // ==========================================
 
     match /{document=**} {
       allow read, write: if false;
