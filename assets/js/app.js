@@ -133,50 +133,8 @@ function downloadCsv(filename, rows) {
 
 async function getSignedInUserProfile(user) {
   if (!user) return null;
-
-  console.log("========== STUDENT ACCOUNT DEBUG ==========");
-  console.log("Firebase Auth UID:", user.uid);
-  console.log("Firebase Auth Email:", user.email);
-  console.log("Firebase Project ID:", APP_CONFIG.firebase.projectId);
-  console.log("Firebase Auth Domain:", APP_CONFIG.firebase.authDomain);
-  console.log("Reading Firestore path:", `users/${user.uid}`);
-
-  try {
-    const userRef = doc(db, "users", user.uid);
-
-    console.log("Firestore document reference:", userRef.path);
-
-    const snapshot = await getDoc(userRef);
-
-    console.log("Firestore read successful:", true);
-    console.log("Document exists:", snapshot.exists());
-
-    if (snapshot.exists()) {
-      console.log("User profile:", snapshot.data());
-
-      return {
-        id: snapshot.id,
-        ...snapshot.data()
-      };
-    }
-
-    console.warn("No user profile found at:", `users/${user.uid}`);
-
-    return null;
-
-  } catch (error) {
-
-    console.error("========== FIRESTORE PROFILE READ FAILED ==========");
-    console.error("Error code:", error.code);
-    console.error("Error message:", error.message);
-    console.error("Firebase Project ID:", APP_CONFIG.firebase.projectId);
-    console.error("Firebase Auth Domain:", APP_CONFIG.firebase.authDomain);
-    console.error("Firebase UID:", user.uid);
-    console.error("Firestore path:", `users/${user.uid}`);
-    console.error("Full Firebase error:", error);
-
-    throw error;
-  }
+  const snapshot = await getDoc(doc(db, "users", user.uid));
+  return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
 }
 
 function showPublicHome() {
@@ -707,44 +665,7 @@ function renderPublicTranscript(student, results) {
 
 
 async function renderStudentPortal(studentId) {
-
-  console.log("========== STUDENT PORTAL DEBUG ==========");
-  console.log("Student ID received:", studentId);
-  console.log("Reading Firestore path:", `students/${studentId}`);
-
-  let studentSnapshot;
-
-  try {
-
-    const studentRef = doc(db, "students", studentId);
-
-    console.log("Student document reference:", studentRef.path);
-
-    studentSnapshot = await getDoc(studentRef);
-
-    console.log("Student Firestore read successful:", true);
-    console.log("Student document exists:", studentSnapshot.exists());
-
-    if (studentSnapshot.exists()) {
-      console.log("Student record:", studentSnapshot.data());
-    }
-
-  } catch (error) {
-
-    console.error("========== STUDENT RECORD READ FAILED ==========");
-    console.error("Error code:", error.code);
-    console.error("Error message:", error.message);
-    console.error("Student ID:", studentId);
-    console.error("Firestore path:", `students/${studentId}`);
-    console.error("Full Firebase error:", error);
-
-    throw error;
-  }
-
-  if (!studentSnapshot.exists()) {
-    await signOut(auth);
-    throw new Error("The student record linked to this account was not found.");
-  }
+  const studentSnapshot = await getDoc(doc(db, "students", studentId));
 
   if (!studentSnapshot.exists()) {
     await signOut(auth);
@@ -910,22 +831,7 @@ async function renderStudentPortal(studentId) {
 
   });
 
-  try {
-    await renderStudentCarryApplication(student, latest);
-  } catch (error) {
-    console.error("Carry-over application loading error:", error);
-
-    const area = document.getElementById("studentCarryApplicationArea");
-
-    if (area) {
-      area.innerHTML = `
-        <div class="message error">
-          Carry-over application service is temporarily unavailable.
-          Your result remains accessible.
-        </div>
-      `;
-    }
-  }
+  await renderStudentCarryApplication(student, latest);
 
   if (years.length) {
     document.querySelector(`.secure-year-btn[data-year="${years[0]}"]`)?.click();
@@ -4535,7 +4441,26 @@ onAuthStateChanged(auth, async (user) => {
         throw new Error("This student login is not linked to a student record.");
       }
 
-      await renderStudentPortal(profile.studentId);
+      try {
+        await renderStudentPortal(profile.studentId);
+      } catch (portalError) {
+        console.error("Student portal load error:", portalError);
+        app.innerHTML = `
+          <main class="login-screen">
+            <section class="login-card">
+              <img src="assets/images/logo.png" class="login-logo" alt="School logo">
+              <h1>Could Not Load Your Results</h1>
+              <div class="message error" style="margin-top:18px">
+                ${escapeHtml(portalError.message)}
+              </div>
+              <button id="portalLogoutBtn" class="primary-btn" style="width:100%;margin-top:18px">
+                Logout
+              </button>
+            </section>
+          </main>
+        `;
+        document.getElementById("portalLogoutBtn").addEventListener("click", () => signOut(auth));
+      }
       return;
     }
 
