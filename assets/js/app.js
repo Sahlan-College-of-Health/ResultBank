@@ -133,8 +133,50 @@ function downloadCsv(filename, rows) {
 
 async function getSignedInUserProfile(user) {
   if (!user) return null;
-  const snapshot = await getDoc(doc(db, "users", user.uid));
-  return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
+
+  console.log("========== STUDENT ACCOUNT DEBUG ==========");
+  console.log("Firebase Auth UID:", user.uid);
+  console.log("Firebase Auth Email:", user.email);
+  console.log("Firebase Project ID:", APP_CONFIG.firebase.projectId);
+  console.log("Firebase Auth Domain:", APP_CONFIG.firebase.authDomain);
+  console.log("Reading Firestore path:", `users/${user.uid}`);
+
+  try {
+    const userRef = doc(db, "users", user.uid);
+
+    console.log("Firestore document reference:", userRef.path);
+
+    const snapshot = await getDoc(userRef);
+
+    console.log("Firestore read successful:", true);
+    console.log("Document exists:", snapshot.exists());
+
+    if (snapshot.exists()) {
+      console.log("User profile:", snapshot.data());
+
+      return {
+        id: snapshot.id,
+        ...snapshot.data()
+      };
+    }
+
+    console.warn("No user profile found at:", `users/${user.uid}`);
+
+    return null;
+
+  } catch (error) {
+
+    console.error("========== FIRESTORE PROFILE READ FAILED ==========");
+    console.error("Error code:", error.code);
+    console.error("Error message:", error.message);
+    console.error("Firebase Project ID:", APP_CONFIG.firebase.projectId);
+    console.error("Firebase Auth Domain:", APP_CONFIG.firebase.authDomain);
+    console.error("Firebase UID:", user.uid);
+    console.error("Firestore path:", `users/${user.uid}`);
+    console.error("Full Firebase error:", error);
+
+    throw error;
+  }
 }
 
 function showPublicHome() {
