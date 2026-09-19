@@ -831,7 +831,22 @@ async function renderStudentPortal(studentId) {
 
   });
 
-  await renderStudentCarryApplication(student, latest);
+  try {
+    await renderStudentCarryApplication(student, latest);
+  } catch (error) {
+    console.error("Carry-over application loading error:", error);
+
+    const area = document.getElementById("studentCarryApplicationArea");
+
+    if (area) {
+      area.innerHTML = `
+        <div class="message error">
+          Carry-over application service is temporarily unavailable.
+          Your result remains accessible.
+        </div>
+      `;
+    }
+  }
 
   if (years.length) {
     document.querySelector(`.secure-year-btn[data-year="${years[0]}"]`)?.click();
