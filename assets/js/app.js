@@ -707,7 +707,44 @@ function renderPublicTranscript(student, results) {
 
 
 async function renderStudentPortal(studentId) {
-  const studentSnapshot = await getDoc(doc(db, "students", studentId));
+
+  console.log("========== STUDENT PORTAL DEBUG ==========");
+  console.log("Student ID received:", studentId);
+  console.log("Reading Firestore path:", `students/${studentId}`);
+
+  let studentSnapshot;
+
+  try {
+
+    const studentRef = doc(db, "students", studentId);
+
+    console.log("Student document reference:", studentRef.path);
+
+    studentSnapshot = await getDoc(studentRef);
+
+    console.log("Student Firestore read successful:", true);
+    console.log("Student document exists:", studentSnapshot.exists());
+
+    if (studentSnapshot.exists()) {
+      console.log("Student record:", studentSnapshot.data());
+    }
+
+  } catch (error) {
+
+    console.error("========== STUDENT RECORD READ FAILED ==========");
+    console.error("Error code:", error.code);
+    console.error("Error message:", error.message);
+    console.error("Student ID:", studentId);
+    console.error("Firestore path:", `students/${studentId}`);
+    console.error("Full Firebase error:", error);
+
+    throw error;
+  }
+
+  if (!studentSnapshot.exists()) {
+    await signOut(auth);
+    throw new Error("The student record linked to this account was not found.");
+  }
 
   if (!studentSnapshot.exists()) {
     await signOut(auth);
