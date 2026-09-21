@@ -46,9 +46,22 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
-    match /courses/{courseId} {
-      allow read, create, update, delete: if isAdmin();
-    }
+        match /courses/{courseId} {
+          allow read: if isAdmin() || isStudent();
+          allow create, update, delete: if isAdmin();
+        }
+
+        match /courseRegistrations/{registrationId} {
+          allow read: if isAdmin() ||
+            (isStudent() && resource.data.studentId == userProfile().studentId);
+    
+          allow create: if isStudent() &&
+            request.resource.data.studentId == userProfile().studentId &&
+            request.resource.data.status == "Submitted" &&
+            studentResultAccess(userProfile().studentId);
+    
+          allow update, delete: if isAdmin();
+        }
 
     match /sessions/{sessionId} {
       allow read, create, update, delete: if isAdmin();
