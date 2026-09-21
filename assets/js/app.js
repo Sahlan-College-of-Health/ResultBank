@@ -831,6 +831,8 @@ async function renderStudentPortal(studentId) {
 
   });
 
+  await renderStudentCourseRegistration(student, results);
+  
   await renderStudentCarryApplication(student, latest);
 
   if (years.length) {
@@ -890,6 +892,701 @@ function openStudentPasswordModal() {
       message.innerHTML = `<div class="message error">${escapeHtml(error.message)}</div>`;
     }
   });
+}
+
+async function renderStudentCourseRegistration(student, results) {
+  const area = document.getElementById("courseRegistrationArea");
+
+  if (!area) return;
+
+  const currentLevel = getStudentRegistrationLevel(student, results);
+  const session = getCurrentAcademicSession();
+
+  const maximumCreditLoad = getMaximumCreditLoad(
+    student.department,
+    currentLevel
+  );
+
+  if (!maximumCreditLoad) {
+    area.innerHTML = `
+      <div class="message error">
+        The maximum credit load for
+        ${escapeHtml(student.department || "")}
+        Year ${currentLevel}
+        has not been configured yet.
+        Please contact the administrator.
+      </div>
+    `;
+    return;
+  }
+
+  try {
+    const registration = await getStudentCourseRegistration(
+      student.id,
+      session
+    );
+
+    if (registration) {
+      renderSubmittedCourseRegistration(
+        area,
+        student,
+        registration
+      );
+      return;
+    }
+
+    const courseSnapshot = await getDocs(
+      collection(db, "courses")
+    );
+
+    const courses = courseSnapshot.docs
+      .map(item => ({
+        id: item.id,
+        ...item.data()
+      }))
+      .filter(course =>
+        String(course.department || "").trim().toUpperCase() ===
+        String(student.department || "").trim().toUpperCase()
+      )
+      .filter(course =>
+        Number(course.level) === Number(currentLevel)
+      )
+      .sort((a, b) => {
+        const semesterA =
+          String(a.semester || "").toLowerCase().startsWith("first")
+            ? 1
+            : 2;
+
+        const semesterB =
+          String(b.semester || "").toLowerCase().startsWith("first")
+            ? 1
+            : 2;
+
+        return semesterA - semesterB ||
+          String(a.courseCode || "").localeCompare(
+            String(b.courseCode || "")
+          );
+      });
+
+    if (!courses.length) {
+      area.innerHTML = `
+        <div class="message">
+          No courses have been uploaded for
+          ${escapeHtml(student.department)}
+          Year ${currentLevel}.
+        </div>
+      `;
+      return;
+    }
+
+    area.innerHTML = `
+      <div class="registration-meta-grid">
+        <div>
+          <span>Academic Session</span>
+          <strong>${escapeHtml(session)}</strong>
+        </div>
+
+        <div>
+          <span>Department</span>
+          <strong>${escapeHtml(student.department)}</strong>
+        </div>
+
+        <div>
+          <span>Level</span>
+          <strong>Year ${currentLevel}</strong>
+        </div>
+
+        <div>
+          <span>Maximum Credit Load</span>
+          <strong>${maximumCreditLoad} Units</strong>
+        </div>
+      </div>
+
+      <div class="credit-load-box">
+        <strong>Selected Credit Load:</strong>
+        <span id="selectedCreditLoad">0</span>
+        /
+        <span>${maximumCreditLoad}</span>
+        Units
+      </div>
+
+      <div class="table-wrap">
+        <table class="course-registration-table">
+          <thead>
+            <tr>
+              <th>Select</th>
+              <th>S/N</th>
+              <th>Course Code</th>
+              <th>Course Title</th>
+              <th>Unit</th>
+              <th>Semester</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            ${courses.map((course, index) => `
+              <tr class="registration-course-row">
+                <td>
+                  <input
+                    type="checkbox"
+                    class="registration-course-checkbox"
+                    data-course-id="${escapeHtml(course.id)}"
+                    data-code="${escapeHtml(course.courseCode || "")}"
+                    data-title="${escapeHtml(course.courseTitle || "")}"
+                    data-unit="${Number(course.units || 0)}"
+                    data-semester="${escapeHtml(course.semester || "")}"
+                  >
+                </td>
+
+                <td>${index + 1}</td>
+
+                <td>
+                  <strong>
+                    ${escapeHtml(course.courseCode || "")}
+                  </strong>
+                </td>
+
+                <td>
+                  ${escapeHtml(course.courseTitle || "")}
+                </td>
+
+                <td>
+                  ${Number(course.units || 0)}
+                </td>
+
+                <td>
+                  ${escapeHtml(course.semester || "")}
+                </td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+
+      <div id="registrationValidationMessage"></div>
+
+      <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap">
+        <button
+          id="submitCourseRegistrationBtn"
+          class="primary-btn"
+        >
+          Submit Course Registration
+        </button>
+
+        <button
+          id="clearCourseSelectionBtn"
+          class="secondary-btn"
+          type="button"
+        >
+          Clear Selection
+        </button>
+      </div>
+    `;
+
+    const checkboxes = [
+      ...document.querySelectorAll(
+        ".registration-course-checkbox"
+      )
+    ];
+
+    const load = () => {
+      const selected = checkboxes
+        .filter(box => box.checked)
+        .reduce(
+          (sum, box) => sum + Number(box.dataset.unit || 0),
+          0
+        );
+
+      const counter =
+        document.getElementById("selectedCreditLoad");
+
+      const message =
+        document.getElementById(
+          "registrationValidationMessage"
+        );
+
+      if (counter) {
+        counter.textContent = selected;
+      }
+
+      if (selected > maximumCreditLoad) {
+        message.innerHTML = `
+          <div class="message error">
+            You have selected ${selected} credit units.
+            The maximum allowed for Year ${currentLevel}
+            ${escapeHtml(student.department)}
+            is ${maximumCreditLoad} units.
+            Please deselect some courses.
+          </div>
+        `;
+      } else {
+        message.innerHTML = "";
+      }
+    };
+
+    checkboxes.forEach(box => {
+      box.addEventListener("change", load);
+    });
+
+    document
+      .getElementById("clearCourseSelectionBtn")
+      .addEventListener("click", () => {
+        checkboxes.forEach(box => {
+          box.checked = false;
+        });
+
+        load();
+      });
+
+    document
+      .getElementById("submitCourseRegistrationBtn")
+      .addEventListener("click", async () => {
+        await submitCourseRegistration(
+          student,
+          currentLevel,
+          session,
+          maximumCreditLoad
+        );
+      });
+
+    load();
+
+  } catch (error) {
+    console.error(
+      "Course registration loading error:",
+      error
+    );
+
+    area.innerHTML = `
+      <div class="message error">
+        ${escapeHtml(error.message)}
+      </div>
+    `;
+  }
+}
+
+async function submitCourseRegistration(
+  student,
+  level,
+  session,
+  maximumCreditLoad
+) {
+  const button =
+    document.getElementById(
+      "submitCourseRegistrationBtn"
+    );
+
+  const message =
+    document.getElementById(
+      "registrationValidationMessage"
+    );
+
+  const checkboxes = [
+    ...document.querySelectorAll(
+      ".registration-course-checkbox:checked"
+    )
+  ];
+
+  const courses = checkboxes.map(box => ({
+    courseId: box.dataset.courseId,
+    courseCode: box.dataset.code,
+    courseTitle: box.dataset.title,
+    units: Number(box.dataset.unit || 0),
+    semester: box.dataset.semester
+  }));
+
+  const totalCreditLoad = calculateRegistrationCredits(
+    courses
+  );
+
+  if (!courses.length) {
+    message.innerHTML = `
+      <div class="message error">
+        Please select at least one course.
+      </div>
+    `;
+    return;
+  }
+
+  if (totalCreditLoad > maximumCreditLoad) {
+    message.innerHTML = `
+      <div class="message error">
+        Your selected credit load is
+        ${totalCreditLoad} units.
+        The maximum allowed is
+        ${maximumCreditLoad} units.
+      </div>
+    `;
+    return;
+  }
+
+  const registrationId =
+    getRegistrationDocumentId(student.id, session);
+
+  button.disabled = true;
+  button.textContent = "Submitting...";
+
+  try {
+    const existing = await getDoc(
+      doc(
+        db,
+        "courseRegistrations",
+        registrationId
+      )
+    );
+
+    if (existing.exists()) {
+      throw new Error(
+        "You have already registered your courses for this academic session. Only the administrator can make corrections."
+      );
+    }
+
+    await setDoc(
+      doc(
+        db,
+        "courseRegistrations",
+        registrationId
+      ),
+      {
+        studentId: student.id,
+        authUid: state.user?.uid || "",
+        studentName: student.name || "",
+        matricNumber: student.matricNumber || "",
+        department: student.department || "",
+        admissionSession: student.admissionSession || "",
+        registrationSession: session,
+        level: Number(level),
+        courses,
+        totalCreditLoad,
+        maximumCreditLoad,
+        status: "Submitted",
+        registeredAt: serverTimestamp()
+      }
+    );
+
+    alert(
+      "Course registration submitted successfully."
+    );
+
+    await renderStudentCourseRegistration(
+      student,
+      []
+    );
+
+  } catch (error) {
+    console.error(
+      "Course registration submission error:",
+      error
+    );
+
+    message.innerHTML = `
+      <div class="message error">
+        ${escapeHtml(error.message)}
+      </div>
+    `;
+
+    button.disabled = false;
+    button.textContent =
+      "Submit Course Registration";
+  }
+}
+
+function renderSubmittedCourseRegistration(
+  area,
+  student,
+  registration
+) {
+  const firstSemester =
+    (registration.courses || []).filter(course =>
+      String(course.semester || "")
+        .toLowerCase()
+        .startsWith("first")
+    );
+
+  const secondSemester =
+    (registration.courses || []).filter(course =>
+      String(course.semester || "")
+        .toLowerCase()
+        .startsWith("second")
+    );
+
+  area.innerHTML = `
+    <div class="message success">
+      <strong>Course Registration Submitted</strong><br>
+      You have already registered your courses for
+      ${escapeHtml(registration.registrationSession)}.
+      <br>
+      Only the administrator can make corrections.
+    </div>
+
+    <div class="registration-meta-grid">
+      <div>
+        <span>Student</span>
+        <strong>${escapeHtml(student.name)}</strong>
+      </div>
+
+      <div>
+        <span>Matric Number</span>
+        <strong>${escapeHtml(student.matricNumber)}</strong>
+      </div>
+
+      <div>
+        <span>Department</span>
+        <strong>${escapeHtml(student.department)}</strong>
+      </div>
+
+      <div>
+        <span>Level</span>
+        <strong>Year ${escapeHtml(registration.level)}</strong>
+      </div>
+
+      <div>
+        <span>Session</span>
+        <strong>${escapeHtml(registration.registrationSession)}</strong>
+      </div>
+
+      <div>
+        <span>Total Credit Load</span>
+        <strong>
+          ${Number(registration.totalCreditLoad || 0)}
+          /
+          ${Number(registration.maximumCreditLoad || 0)}
+          Units
+        </strong>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="course-registration-table">
+        <thead>
+          <tr>
+            <th>S/N</th>
+            <th>Course Code</th>
+            <th>Course Title</th>
+            <th>Unit</th>
+            <th>Semester</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          ${(registration.courses || []).map(
+            (course, index) => `
+              <tr>
+                <td>${index + 1}</td>
+                <td><strong>${escapeHtml(course.courseCode)}</strong></td>
+                <td>${escapeHtml(course.courseTitle)}</td>
+                <td>${Number(course.units || 0)}</td>
+                <td>${escapeHtml(course.semester)}</td>
+              </tr>
+            `
+          ).join("")}
+        </tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:18px">
+      <button
+        id="printCourseRegistrationBtn"
+        class="primary-btn"
+      >
+        Print Course Registration Form
+      </button>
+    </div>
+  `;
+
+  document
+    .getElementById("printCourseRegistrationBtn")
+    ?.addEventListener(
+      "click",
+      () => printCourseRegistrationForm(
+        student,
+        registration
+      )
+    );
+}
+
+function printCourseRegistrationForm(
+  student,
+  registration
+) {
+  document
+    .getElementById("printOnlyContainer")
+    ?.remove();
+
+  const container =
+    document.createElement("div");
+
+  container.id =
+    "printOnlyContainer";
+
+  container.className =
+    "course-registration-print-container";
+
+  const college =
+    getCollegeConfig(student);
+
+  container.innerHTML = `
+    <article class="official-result course-registration-print">
+
+      ${officialResultHeader(
+        "COURSE REGISTRATION FORM",
+        student
+      )}
+
+      <div class="registration-print-title">
+        ${escapeHtml(
+          registration.registrationSession
+        )}
+      </div>
+
+      <div class="registration-print-details">
+
+        <div>
+          <span>Student Name</span>
+          <strong>
+            ${escapeHtml(student.name)}
+          </strong>
+        </div>
+
+        <div>
+          <span>Matric Number</span>
+          <strong>
+            ${escapeHtml(student.matricNumber)}
+          </strong>
+        </div>
+
+        <div>
+          <span>Department</span>
+          <strong>
+            ${escapeHtml(student.department)}
+          </strong>
+        </div>
+
+        <div>
+          <span>Level</span>
+          <strong>
+            Year ${escapeHtml(
+              registration.level
+            )}
+          </strong>
+        </div>
+
+        <div>
+          <span>Admission Session</span>
+          <strong>
+            ${escapeHtml(
+              student.admissionSession || ""
+            )}
+          </strong>
+        </div>
+
+        <div>
+          <span>Registration Session</span>
+          <strong>
+            ${escapeHtml(
+              registration.registrationSession
+            )}
+          </strong>
+        </div>
+
+      </div>
+
+      <table class="application-print-table">
+        <thead>
+          <tr>
+            <th>S/N</th>
+            <th>Course Code</th>
+            <th>Course Title</th>
+            <th>Unit</th>
+            <th>Semester</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          ${(registration.courses || [])
+            .map(
+              (course, index) => `
+                <tr>
+                  <td>${index + 1}</td>
+                  <td>
+                    ${escapeHtml(
+                      course.courseCode
+                    )}
+                  </td>
+                  <td>
+                    ${escapeHtml(
+                      course.courseTitle
+                    )}
+                  </td>
+                  <td>
+                    ${Number(
+                      course.units || 0
+                    )}
+                  </td>
+                  <td>
+                    ${escapeHtml(
+                      course.semester
+                    )}
+                  </td>
+                </tr>
+              `
+            )
+            .join("")}
+        </tbody>
+
+        <tfoot>
+          <tr>
+            <th colspan="3">
+              TOTAL CREDIT LOAD
+            </th>
+            <th>
+              ${Number(
+                registration.totalCreditLoad || 0
+              )}
+            </th>
+            <th>
+              Maximum:
+              ${Number(
+                registration.maximumCreditLoad || 0
+              )}
+            </th>
+          </tr>
+        </tfoot>
+      </table>
+
+      <div class="registration-declaration">
+        <p>
+          I hereby confirm that the courses listed above
+          are the courses I intend to offer for the stated
+          academic session.
+        </p>
+      </div>
+
+      ${signatureSection()}
+
+    </article>
+  `;
+
+  document.body.appendChild(container);
+  document.body.classList.add("printing-result");
+
+  const cleanup = () => {
+    document.body.classList.remove(
+      "printing-result"
+    );
+    container.remove();
+    window.removeEventListener(
+      "afterprint",
+      cleanup
+    );
+  };
+
+  window.addEventListener(
+    "afterprint",
+    cleanup
+  );
+
+  window.print();
 }
 
 async function renderStudentCarryApplication(student, latestResult) {
@@ -3148,7 +3845,10 @@ async function saveImportToFirestore() {
   message.innerHTML = "";
 
   try {
-    const allWrites = buildFirestoreWrites(pendingImport);
+    const allWrites =
+      await buildFirestoreWrites(
+        pendingImport
+      );
     const updateExisting = document.getElementById("updateExistingResults")?.checked || false;
 
     const existingByCollection = {
@@ -3211,7 +3911,59 @@ async function saveImportToFirestore() {
   }
 }
 
-function buildFirestoreWrites(data) {
+async function getRegisteredCourseCodes(
+  studentId,
+  session
+) {
+  const registrationId =
+    getRegistrationDocumentId(
+      studentId,
+      session
+    );
+
+  const snapshot = await getDoc(
+    doc(
+      db,
+      "courseRegistrations",
+      registrationId
+    )
+  );
+
+  if (!snapshot.exists()) {
+    return null;
+  }
+
+  const registration =
+    snapshot.data();
+
+  return new Set(
+    (registration.courses || [])
+      .map(course =>
+        normalizeCourseCode(
+          course.courseCode
+        )
+      )
+  );
+}
+
+function filterCoursesToRegistration(
+  courses,
+  registeredCourseCodes
+) {
+  if (!registeredCourseCodes) {
+    return [];
+  }
+
+  return (courses || []).filter(course =>
+    registeredCourseCodes.has(
+      normalizeCourseCode(
+        course.courseCode
+      )
+    )
+  );
+}
+
+async function buildFirestoreWrites(data) {
   const writes = [];
   const now = serverTimestamp();
   const sessionId = safeDocumentId(data.metadata.admissionSession);
@@ -3226,7 +3978,7 @@ function buildFirestoreWrites(data) {
     }
   });
 
-  data.students.forEach((student) => {
+  for (const student of data.students) {
     const studentId = safeDocumentId(student.matricNumber);
     const resultId = safeDocumentId(
       `${student.matricNumber}_${data.metadata.resultSession}_${data.metadata.level}_${data.metadata.semester}`
@@ -3256,7 +4008,7 @@ function buildFirestoreWrites(data) {
         resultSession: data.metadata.resultSession,
         level: data.metadata.level,
         semester: data.metadata.semester,
-        courses: calculateCourseRows(student.courses, student.department),
+        courses: calculateCourseRows(registeredCourses, student.department),
         ...calculateSemesterSummary(student.courses, student.department),
         cgpa: null,
         unresolvedCarryOvers: [],
@@ -3270,13 +4022,41 @@ function buildFirestoreWrites(data) {
   return writes;
 }
 
+const MAX_CREDIT_LOADS = {
+  CHEW: {
+    1: 50,
+    2: 55,
+    3: 50
+  },
+
+  MLT: {
+    1: 48,
+    2: 50,
+    3: 46
+  },
+
+  NURSING: {
+    1: 48,
+    2: 50,
+    3: 55
+  }
+};
+
+const PROGRAMME_MAX_LEVEL = 3;
+
+function getMaximumCreditLoad(department, level) {
+  const dept = String(department || "").trim().toUpperCase();
+  const year = Number(level || 0);
+
+  return Number(MAX_CREDIT_LOADS[dept]?.[year] || 0);
+}
 
 const DEFAULT_GRADING = [
   { min: 70, max: 100, grade: "A", point: 5, status: "Passed" },
   { min: 60, max: 69, grade: "B", point: 4, status: "Passed" },
   { min: 50, max: 59, grade: "C", point: 3, status: "Passed" },
-  { min: 45, max: 49, grade: "D", point: 2, status: "Passed" },
-  { min: 40, max: 44, grade: "E", point: 1, status: "Passed" },
+  { min: 45, max: 49, grade: "D", point: 2, status: "Carry Over" },
+  { min: 40, max: 44, grade: "E", point: 1, status: "Carry Over" },
   { min: 0, max: 39, grade: "F", point: 0, status: "Carry Over" }
 ];
 const DEFAULT_REMARKS = [
@@ -3316,6 +4096,143 @@ function academicRemark(cgpa,department=null,carryOvers=0){
 function isProbationStanding(cgpa,department=null){
   if(collegeKeyForDepartment(department)==="nursing") return false;
   const settings=gradingForDepartment(department);const lowest=[...settings.remarks].sort((a,b)=>Number(a.min)-Number(b.min))[0];return !!lowest && Number(cgpa||0)>=Number(lowest.min) && Number(cgpa||0)<=Number(lowest.max);
+}
+
+function getCurrentAcademicSession() {
+  const now = new Date();
+
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+
+  /*
+   * Nigerian academic session is treated as September-August.
+   * September 2026 -> 2026/2027
+   * August 2027   -> 2026/2027
+   */
+  if (month >= 9) {
+    return `${year}/${year + 1}`;
+  }
+
+  return `${year - 1}/${year}`;
+}
+
+function getRegistrationDocumentId(studentId, session) {
+  return `${safeDocumentId(studentId)}_${safeDocumentId(session)}`;
+}
+
+function getStudentRegistrationLevel(student, results = []) {
+  const existingLevel = Number(student.currentLevel || 0);
+
+  if (existingLevel >= 1 && existingLevel <= PROGRAMME_MAX_LEVEL) {
+    return existingLevel;
+  }
+
+  const completedLevels = [];
+
+  [1, 2, 3].forEach(level => {
+    const first = results.some(result =>
+      Number(result.level) === level &&
+      String(result.semester || "").toLowerCase().startsWith("first")
+    );
+
+    const second = results.some(result =>
+      Number(result.level) === level &&
+      String(result.semester || "").toLowerCase().startsWith("second")
+    );
+
+    if (first && second) {
+      completedLevels.push(level);
+    }
+  });
+
+  if (!completedLevels.length) {
+    return 1;
+  }
+
+  const highestCompleted = Math.max(...completedLevels);
+
+  return Math.min(highestCompleted + 1, PROGRAMME_MAX_LEVEL);
+}
+
+async function getStudentCourseRegistration(studentId, session) {
+  const registrationId = getRegistrationDocumentId(studentId, session);
+
+  const snapshot = await getDoc(
+    doc(db, "courseRegistrations", registrationId)
+  );
+
+  if (!snapshot.exists()) {
+    return null;
+  }
+
+  return {
+    id: snapshot.id,
+    ...snapshot.data()
+  };
+}
+
+function registrationCourseKey(course) {
+  return normalizeCourseCode(course.courseCode);
+}
+
+function calculateRegistrationCredits(courses) {
+  return (courses || []).reduce(
+    (total, course) => total + Number(course.units || 0),
+    0
+  );
+}
+
+function hasCompletedFullAcademicYear(results, level) {
+  const firstSemester = results.some(result =>
+    Number(result.level) === Number(level) &&
+    String(result.semester || "")
+      .toLowerCase()
+      .startsWith("first")
+  );
+
+  const secondSemester = results.some(result =>
+    Number(result.level) === Number(level) &&
+    String(result.semester || "")
+      .toLowerCase()
+      .startsWith("second")
+  );
+
+  return firstSemester && secondSemester;
+}
+
+async function updateStudentCurrentLevel(studentId, results) {
+  const studentSnapshot = await getDoc(
+    doc(db, "students", studentId)
+  );
+
+  if (!studentSnapshot.exists()) {
+    return;
+  }
+
+  const student = {
+    id: studentSnapshot.id,
+    ...studentSnapshot.data()
+  };
+
+  let currentLevel = Number(student.currentLevel || 1);
+
+  while (
+    currentLevel < PROGRAMME_MAX_LEVEL &&
+    hasCompletedFullAcademicYear(results, currentLevel)
+  ) {
+    currentLevel += 1;
+  }
+
+  if (currentLevel !== Number(student.currentLevel || 1)) {
+    await setDoc(
+      doc(db, "students", studentId),
+      {
+        currentLevel,
+        updatedAt: serverTimestamp()
+      },
+      { merge: true }
+    );
+  }
 }
 
 function resultSortKey(result) {
@@ -4170,6 +5087,26 @@ async function renderStudentProfile(studentId, session) {
       </div>
     </section>
 
+    <section class="section">
+      <div class="card">
+        <div class="section-head">
+          <div>
+            <h3>Course Registration</h3>
+            <p>
+              Register the courses you will offer for the current
+              academic session.
+            </p>
+          </div>
+        </div>
+
+        <div id="courseRegistrationArea">
+          <div class="placeholder">
+            Loading course registration...
+          </div>
+        </div>
+      </div>
+    </section>
+    
     <section class="section">
       <div class="year-buttons">
         ${years.map(y => `<button class="year-result-btn" data-year="${y}"><strong>Year ${y}</strong><span>First and Second Semester</span></button>`).join("")}
