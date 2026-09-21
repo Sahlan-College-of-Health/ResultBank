@@ -878,3 +878,106 @@ th {
 
 /* Version 4.0 additions */
 .college-switcher{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700}.college-switcher select{max-width:230px}.access-locked-card{text-align:center;padding:60px 28px}.locked-icon{font-size:44px;margin-bottom:10px}.student-view-only-badge{display:inline-block;padding:7px 12px;border-radius:999px;background:#eef4fb;font-weight:700}.grading-college-card{margin-top:18px}.grading-college-card h4{margin-top:16px}.course-list-heading{text-align:center;font-size:18px;font-weight:800;margin:14px 0 8px}.bulk-pdf-page{width:194mm!important;box-sizing:border-box!important;padding:3mm!important;background:#fff!important;color:#111!important;font-family:Arial,Helvetica,sans-serif!important;border:.35mm solid #07366f!important}.bulk-pdf-page .result-header{display:block!important;text-align:center!important;margin:0 0 2mm!important;padding:0 0 2mm!important;border-bottom:.65mm double #07366f!important}.bulk-pdf-page .result-header img{display:block!important;width:20mm!important;height:auto!important;margin:0 auto 1mm!important}.bulk-pdf-page .result-header h1{margin:0!important;font-size:15pt!important;font-weight:900!important;line-height:1.04!important;color:#07366f!important}.bulk-pdf-page .result-header h2{margin:.8mm 0 0!important;font-size:10pt!important;font-weight:900!important;color:#c18d00!important}.bulk-pdf-page .student-detail-grid{display:grid!important;grid-template-columns:1.15fr 1.15fr .8fr!important;gap:1mm 5mm!important;margin:0 0 2mm!important;font-size:9pt!important;font-weight:600!important;line-height:1.1!important}.bulk-pdf-page .semester-block{margin:1.5mm 0 0!important}.bulk-pdf-page .semester-heading{padding:.7mm 1.5mm!important;text-align:center!important;background:#07366f!important;color:#fff!important}.bulk-pdf-page .semester-heading h3{margin:0!important;font-size:9pt!important}.bulk-pdf-page .result-table-wrap{overflow:visible!important}.bulk-pdf-page .result-table-wrap table{width:100%!important;border-collapse:collapse!important;table-layout:fixed!important;font-size:7.25pt!important;line-height:1.02!important}.bulk-pdf-page .result-table-wrap th,.bulk-pdf-page .result-table-wrap td{padding:.7mm!important;border:.2mm solid #7892b4!important;vertical-align:middle!important;overflow-wrap:anywhere!important}.bulk-pdf-page .result-table-wrap th{background:#07366f!important;color:#fff!important;font-weight:900!important}.bulk-pdf-page .semester-summary{display:flex!important;flex-wrap:wrap!important;justify-content:space-between!important;gap:.5mm 2mm!important;padding:.7mm 1mm!important;font-size:7.1pt!important;font-weight:800!important;border:.2mm solid #7892b4!important}.bulk-pdf-page .final-summary{display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;gap:1mm!important;margin:2mm 0 0!important}.bulk-pdf-page .final-summary>div{min-height:11mm!important;padding:1mm!important;text-align:center!important;border:.25mm solid #07366f!important}.bulk-pdf-page .final-summary span{display:block!important;font-size:6.2pt!important;font-weight:900!important}.bulk-pdf-page .final-summary strong{font-size:9pt!important;font-weight:900!important}.bulk-pdf-page .single-signature{display:flex!important;justify-content:flex-end!important;margin:28mm 0 0!important}.bulk-pdf-page .single-signature>div{width:60mm!important;text-align:center!important}.bulk-pdf-page .single-signature .signature-space{display:block!important;height:16mm!important;border-bottom:.35mm solid #111!important;margin-bottom:1.5mm!important}.bulk-pdf-page .single-signature strong{font-size:7.5pt!important}
+
+.registration-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.registration-meta-grid > div {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.registration-meta-grid span,
+.registration-print-details span {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+
+.registration-meta-grid strong,
+.registration-print-details strong {
+  display: block;
+}
+
+.credit-load-box {
+  padding: 16px;
+  margin: 16px 0;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 17px;
+}
+
+#selectedCreditLoad {
+  font-weight: 800;
+  font-size: 21px;
+}
+
+.course-registration-table th,
+.course-registration-table td {
+  vertical-align: middle;
+}
+
+.registration-course-checkbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.registration-print-title {
+  text-align: center;
+  font-weight: 800;
+  margin: 10px 0 18px;
+  font-size: 16px;
+}
+
+.registration-print-details {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.registration-print-details > div {
+  border: 1px solid #ccc;
+  padding: 8px;
+}
+
+.registration-declaration {
+  margin-top: 18px;
+  padding: 12px;
+  border: 1px solid #ccc;
+  font-size: 12px;
+}
+
+@media print {
+  .course-registration-print {
+    width: 100%;
+  }
+
+  .registration-print-details {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .course-registration-print .application-print-table {
+    font-size: 10px;
+  }
+
+  .course-registration-print .application-print-table th,
+  .course-registration-print .application-print-table td {
+    padding: 5px;
+  }
+}
+
+@media (max-width: 700px) {
+  .registration-print-details {
+    grid-template-columns: 1fr 1fr;
+  }
+}
