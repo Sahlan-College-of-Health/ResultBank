@@ -697,12 +697,17 @@ async function renderStudentPortal(studentId) {
     query(collection(db, "results"), where("studentId", "==", studentId))
   );
 
-  const results = resultSnapshot.docs
-    .map(item => ({ id: item.id, ...item.data() }))
-    .sort((a, b) => resultSortKey(a) - resultSortKey(b));
+const results = resultSnapshot.docs
+  .map(item => ({ id: item.id, ...item.data() }))
+  .sort((a, b) => resultSortKey(a) - resultSortKey(b));
 
-  const latest = results[results.length - 1] || {};
-  const years = [...new Set(results.map(result => Number(result.level)).filter(Boolean))].sort();
+const calculatedCurrentLevel =
+  await updateStudentCurrentLevel(studentId, results);
+
+student.currentLevel = calculatedCurrentLevel;
+
+const latest = results[results.length - 1] || {};
+const years = [...new Set(results.map(result => Number(result.level)).filter(Boolean))].sort();
 
   app.innerHTML = `
     <div class="public-page-shell">
@@ -731,7 +736,16 @@ async function renderStudentPortal(studentId) {
                 <div><span>Sex</span><strong>${escapeHtml(student.sex || "Not specified")}</strong></div>
                 <div><span>Department</span><strong>${escapeHtml(student.department)}</strong></div>
                 <div><span>Admission Session</span><strong>${escapeHtml(student.admissionSession)}</strong></div>
-                <div><span>Current Level</span><strong>Year ${escapeHtml(student.currentLevel)}</strong></div>
+                <div>
+                  <span>Current Level</span>
+                  <strong>
+                    ${
+                      Number(student.currentLevel) >= 3
+                        ? "Final Year Student"
+                        : `Year ${escapeHtml(student.currentLevel)}`
+                    }
+                  </strong>
+                </div>
                 <div><span>Current CGPA</span><strong>${formatNumber(latest.cgpa)}</strong></div>
                 <div><span>Outstanding Carry Overs</span><strong>${Number(latest.carryOvers || 0)}</strong></div>
                 <div><span>Current Remark</span><strong>${escapeHtml(latest.remark || "Not available")}</strong></div>
@@ -1906,6 +1920,7 @@ async function renderDashboard() {
         ${quickAction("bulkResults", "Bulk Session Results", "Download one PDF containing one full A4 page per student.")}
         ${quickAction("results", "Manage Results", "Review and update student academic records.")}
         ${quickAction("carryApplications", "Carry-Over Applications", "Review and print students applying to rewrite carry-over courses.")}
+        ${quickAction("browse", "Course Registration Modification", "Open a student academic profile and modify the courses registered for any academic session.")}
         ${quickAction("sessions", "Admission Sessions", "Organize students according to admission year.")}
         ${quickAction("courses", "Course Database", "View courses and credit units.")}
         ${quickAction("settings", "School Settings", "Update institution details and grading information.")}
@@ -4337,6 +4352,8 @@ async function updateStudentCurrentLevel(studentId, results) {
       { merge: true }
     );
   }
+
+  return currentLevel;
 }
 
 function resultSortKey(result) {
@@ -5168,11 +5185,17 @@ async function renderStudentProfile(studentId, session) {
   if (!sd) return alert("Student not found.");
   const student = {id:sd.id, ...sd.data()};
   const rs = await getDocs(collection(db, "results"));
-  const results = rs.docs.map(d => ({id:d.id, ...d.data()}))
-    .filter(r => r.studentId === studentId || r.matricNumber === student.matricNumber)
-    .sort((a,b) => resultSortKey(a)-resultSortKey(b));
-  const latest = results[results.length-1] || {};
-  const years = [...new Set(results.map(r => Number(r.level)).filter(Boolean))].sort();
+const results = rs.docs.map(d => ({id:d.id, ...d.data()}))
+  .filter(r => r.studentId === studentId || r.matricNumber === student.matricNumber)
+  .sort((a,b) => resultSortKey(a)-resultSortKey(b));
+
+const calculatedCurrentLevel =
+  await updateStudentCurrentLevel(studentId, results);
+
+student.currentLevel = calculatedCurrentLevel;
+
+const latest = results[results.length-1] || {};
+const years = [...new Set(results.map(r => Number(r.level)).filter(Boolean))].sort();
 
   dashboardLayout(`
     <section class="section-head">
@@ -5200,8 +5223,11 @@ async function renderStudentProfile(studentId, session) {
     <section class="card section">
       <div class="section-head">
         <div>
-          <h3>Course Registration (Admin)</h3>
-          <p>Correct the courses this student registered for a session, then save. The student can re-download the form after you save.</p>
+          <h3>Course Registration Modification</h3>
+          <p>
+            Administrators can modify the student's registered courses for the selected academic session.
+            Students cannot make changes after submission.
+          </p>
         </div>
       </div>
 
